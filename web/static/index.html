@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Organizer</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="appbar">
+    <h1>Data Organizer</h1>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button type="button" role="tab" id="tab-wizard" aria-controls="view-wizard" aria-selected="true">New backup</button>
+      <button type="button" role="tab" id="tab-progress" aria-controls="view-progress" aria-selected="false">
+        Progress <span id="tab-progress-dot" class="live-dot" hidden></span>
+      </button>
+      <button type="button" role="tab" id="tab-history" aria-controls="view-history" aria-selected="false">Backups</button>
+      <button type="button" role="tab" id="tab-backup" aria-controls="view-backup" aria-selected="false" hidden>Backup</button>
+      <button type="button" role="tab" id="tab-restores" aria-controls="view-restores" aria-selected="false">
+        Restores <span id="tab-restores-dot" class="live-dot" hidden></span>
+      </button>
+      <button type="button" role="tab" id="tab-restore" aria-controls="view-restore" aria-selected="false" hidden>Restore</button>
+    </nav>
+  </header>
+
+  <!-- New backup wizard: choose paths in the tree, then start. -->
+  <section id="view-wizard" class="view wizard" role="tabpanel" aria-labelledby="tab-wizard">
+    <div class="toolbar">
+      <div class="selection-tools">
+        <span id="selection-count" class="count" aria-live="polite">No selection</span>
+        <button id="reveal-selected" type="button" title="Expand all folders needed to show the selected items" aria-keyshortcuts="Control+Enter" disabled>
+          <span class="button-label">Show selected</span> <kbd>Ctrl</kbd>+<kbd>Enter</kbd>
+        </button>
+        <button id="clear-selection" type="button" disabled>Clear</button>
+      </div>
+      <div class="toolbar-actions">
+        <label class="field">
+          <span>Page size</span>
+          <select id="page-size">
+            <option>50</option>
+            <option>100</option>
+            <option selected>200</option>
+            <option>500</option>
+            <option>1000</option>
+          </select>
+        </label>
+        <button id="collapse-all" type="button">Collapse all</button>
+        <button id="start-backup" type="button" class="primary" disabled>Start backup</button>
+      </div>
+    </div>
+
+    <div class="browser">
+      <div class="columns" aria-hidden="true">
+        <span>Name</span>
+        <span class="num">Size</span>
+        <span class="col-date">Modified</span>
+        <span class="col-date">Created</span>
+      </div>
+      <div id="tree" class="tree" role="tree" tabindex="0" aria-label="Local file system" aria-multiselectable="true"></div>
+    </div>
+
+    <footer class="statusbar">
+      <span id="selection" class="selection" aria-live="polite"></span>
+      <span class="keys">
+        <kbd>↑</kbd><kbd>↓</kbd> move
+        <kbd>→</kbd> open
+        <kbd>←</kbd> close / parent
+        <kbd>Space</kbd> select
+        <kbd>Shift</kbd>+click / drag toggle
+        <kbd>Esc</kbd> clear
+        <kbd>Ctrl</kbd>+<kbd>A</kbd> all
+        <kbd>Ctrl</kbd>+<kbd>Enter</kbd> show selected
+        <kbd>*</kbd> open siblings
+        <kbd>R</kbd> reload
+        type to find
+      </span>
+    </footer>
+  </section>
+
+  <!-- Progress of the active (or most recent) backup. -->
+  <section id="view-progress" class="view page" role="tabpanel" aria-labelledby="tab-progress" hidden>
+    <div id="progress-empty" class="empty">
+      <p>No backup yet.</p>
+      <p>Select folders or files under <strong>New backup</strong> and press <strong>Start backup</strong>.</p>
+    </div>
+    <article id="progress-card" class="panel" hidden>
+      <div class="panel-head">
+        <h2 id="progress-title">Backup</h2>
+        <span id="progress-status" class="badge"></span>
+        <div class="panel-actions">
+          <button id="progress-browse" type="button" class="primary" hidden>Browse</button>
+          <button id="pause-backup" type="button">Pause</button>
+          <button id="stop-backup" type="button" class="danger">Stop</button>
+        </div>
+      </div>
+      <p id="progress-error" class="error-text" hidden></p>
+
+      <div class="meter" role="progressbar" aria-label="Size hashed of size found" aria-valuemin="0" aria-valuemax="100">
+        <div id="progress-bar" class="meter-fill"></div>
+      </div>
+      <p class="meter-line"><span id="progress-line"></span><strong id="progress-eta" class="meter-eta"></strong></p>
+      <p id="progress-detail" class="meter-detail"></p>
+
+      <h3>Paths</h3>
+      <ul id="progress-roots" class="path-list"></ul>
+    </article>
+  </section>
+
+  <!-- A completed backup: only backed-up items; later copies struck through; exclusions. -->
+  <section id="view-backup" class="view wizard browse" role="tabpanel" aria-labelledby="tab-backup" hidden>
+    <div class="toolbar">
+      <div class="selection-tools">
+        <strong id="backup-title" class="browse-title">Backup</strong>
+        <button id="backup-exclude" type="button" title="Exclude or include the focused items, including everything below folders" aria-keyshortcuts="Delete" disabled>
+          <span class="button-label">Exclude</span> <kbd>Del</kbd>
+        </button>
+        <span id="backup-notice" class="count" role="status" hidden></span>
+      </div>
+      <div class="toolbar-actions">
+        <ul class="legend" aria-label="Legend">
+          <li><span class="swatch unique"></span>Item</li>
+          <li><span class="swatch later-copy">abc</span>Later copy (an earlier one exists)</li>
+          <li><span class="swatch excluded"></span>Excluded</li>
+          <li><span class="swatch unreadable"></span>Unreadable</li>
+        </ul>
+        <button id="backup-restore" type="button" class="primary" title="Restore everything not excluded, only the first copy of each duplicate, to a folder">Restore…</button>
+        <button id="backup-reset" type="button" class="danger" title="Remove all exclusions of this backup">Reset exclusions…</button>
+        <button id="backup-collapse-all" type="button">Collapse all</button>
+      </div>
+    </div>
+
+    <div class="browser">
+      <div class="columns" aria-hidden="true">
+        <span>Name</span>
+        <span class="num">Size</span>
+        <span class="col-date">Modified</span>
+      </div>
+      <div id="backup-tree-container" class="tree-container"></div>
+    </div>
+
+    <footer class="statusbar">
+      <span id="backup-selection" class="selection" aria-live="polite"></span>
+      <span class="keys">
+        <kbd>↑</kbd><kbd>↓</kbd> move
+        <kbd>→</kbd> open
+        <kbd>←</kbd> close / parent
+        <kbd>Shift</kbd>+move range
+        <kbd>Del</kbd> exclude / include
+        <kbd>*</kbd> open siblings
+        type to find
+      </span>
+    </footer>
+  </section>
+
+  <!-- Restores: the running or latest restore, and all earlier restores. -->
+  <section id="view-restores" class="view page" role="tabpanel" aria-labelledby="tab-restores" hidden>
+    <div id="restore-empty" class="empty">
+      <p>No restore yet.</p>
+      <p>Browse a backup under <strong>Backups</strong> and press <strong>Restore…</strong>.</p>
+    </div>
+    <article id="restore-card" class="panel" hidden>
+      <div class="panel-head">
+        <h2 id="restore-title">Restore</h2>
+        <span id="restore-status" class="badge"></span>
+        <div class="panel-actions">
+          <button id="restore-browse" type="button" class="primary">Browse</button>
+          <button id="restore-pause" type="button">Pause</button>
+          <button id="restore-stop" type="button" class="danger">Stop</button>
+        </div>
+      </div>
+      <p id="restore-target" class="restore-target"></p>
+      <p id="restore-error" class="error-text" hidden></p>
+      <div class="meter" role="progressbar" aria-label="Size restored of size to restore" aria-valuemin="0" aria-valuemax="100">
+        <div id="restore-bar" class="meter-fill"></div>
+      </div>
+      <p class="meter-line"><span id="restore-line"></span><strong id="restore-eta" class="meter-eta"></strong></p>
+      <dl class="stats stats-2">
+        <div><dt>Restored</dt><dd id="restore-ok">0</dd></div>
+        <div class="stat-bad"><dt>Failed</dt><dd id="restore-failed">0</dd></div>
+      </dl>
+    </article>
+
+    <h2 class="section-title">Restore history</h2>
+    <div id="restore-history-empty" class="empty"><p>No restores yet.</p></div>
+    <div class="table-wrap">
+      <table id="restore-history-table" class="history" hidden>
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Backup</th>
+            <th scope="col">Target</th>
+            <th scope="col">Started</th>
+            <th scope="col">Duration</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="num">Restored</th>
+            <th scope="col" class="num">Failed</th>
+            <th scope="col" class="num">Size</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody id="restore-history-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- One restore: what was restored, what failed. -->
+  <section id="view-restore" class="view wizard browse restore" role="tabpanel" aria-labelledby="tab-restore" hidden>
+    <div class="toolbar">
+      <div class="selection-tools">
+        <strong id="restoreview-title" class="browse-title">Restore</strong>
+        <span id="restoreview-target" class="count"></span>
+      </div>
+      <div class="toolbar-actions">
+        <ul class="legend" aria-label="Legend">
+          <li><span class="swatch unique"></span>Restored</li>
+          <li><span class="swatch failed"></span>Failed</li>
+          <li><span class="marker errors">●</span>errors below</li>
+        </ul>
+        <button id="restoreview-collapse-all" type="button">Collapse all</button>
+      </div>
+    </div>
+    <div class="browser">
+      <div class="columns" aria-hidden="true">
+        <span>Name</span>
+        <span class="num">Size</span>
+        <span class="col-date">Outcome</span>
+      </div>
+      <div id="restoreview-tree-container" class="tree-container"></div>
+    </div>
+    <footer class="statusbar">
+      <span id="restoreview-selection" class="selection" aria-live="polite"></span>
+      <span class="keys">
+        <kbd>↑</kbd><kbd>↓</kbd> move
+        <kbd>→</kbd> open
+        <kbd>←</kbd> close / parent
+        <kbd>*</kbd> open siblings
+        type to find
+      </span>
+    </footer>
+  </section>
+
+  <!-- Restore: choose the target folder. -->
+  <div id="restore-dialog" class="modal" role="dialog" aria-modal="true" aria-labelledby="restore-dialog-title" hidden>
+    <div class="modal-card">
+      <h2 id="restore-dialog-title">Restore</h2>
+      <p class="confirm-text">
+        Restores every item that is not excluded and, of duplicates, only the first copy by path.
+        Each backed-up path keeps its structure below the target, e.g. <code>C:\Users\x</code> → <code>&lt;target&gt;\C\Users\x</code>.
+        The target folder must be new or empty.
+      </p>
+      <label class="field-block" for="restore-target-input">Target folder</label>
+      <div class="input-row">
+        <input id="restore-target-input" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. E:\backup">
+        <button id="restore-pick" type="button">Browse…</button>
+      </div>
+      <p id="restore-dialog-error" class="error-text" hidden></p>
+      <div class="modal-actions">
+        <button id="restore-dialog-cancel" type="button">Cancel</button>
+        <button id="restore-dialog-start" type="button" class="primary">Start restore</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Folder picker for the restore target (all drives, incl. mounted ones). -->
+  <div id="picker-dialog" class="modal" role="dialog" aria-modal="true" aria-labelledby="picker-title" hidden>
+    <div class="modal-card picker-card">
+      <h2 id="picker-title">Choose the target folder</h2>
+      <div id="picker-tree-container" class="tree-container picker-tree"></div>
+      <p id="picker-path" class="picker-path"></p>
+      <div class="modal-actions">
+        <button id="picker-cancel" type="button">Cancel</button>
+        <button id="picker-use" type="button" class="primary">Use this folder</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation for irreversible actions. -->
+  <div id="confirm-dialog" class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text" hidden>
+    <div class="modal-card">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-text" class="confirm-text"></p>
+      <div class="modal-actions">
+        <button id="confirm-cancel" type="button">Cancel</button>
+        <button id="confirm-ok" type="button" class="danger-solid"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shown over everything while the Go backend cannot be reached. -->
+  <div id="backend-down" class="backend-down" role="alertdialog" aria-modal="true" aria-labelledby="backend-down-title" aria-describedby="backend-down-text" hidden>
+    <div class="backend-down-card">
+      <h2 id="backend-down-title">Backend not available</h2>
+      <p id="backend-down-text">
+        The data_organizer server at <code id="backend-origin"></code> is not responding.
+        Start it again (<code>go run .</code>) and this page will continue by itself.
+      </p>
+      <p class="backend-down-status"><span class="spinner"></span> <span id="backend-down-status">Retrying…</span></p>
+      <button id="backend-retry" type="button" class="primary">Retry now</button>
+    </div>
+  </div>
+
+  <!-- All backups. -->
+  <section id="view-history" class="view page" role="tabpanel" aria-labelledby="tab-history" hidden>
+    <p id="history-notice" class="history-notice" role="status" hidden></p>
+    <div id="history-empty" class="empty"><p>No backups yet.</p></div>
+    <div class="table-wrap">
+      <table id="history-table" class="history" hidden>
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Started</th>
+            <th scope="col">Duration</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="num">Directories</th>
+            <th scope="col" class="num">Files</th>
+            <th scope="col" class="num">Size</th>
+            <th scope="col" class="num">Unreadable</th>
+            <th scope="col">Paths</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </div>
+  </section>
+</body>
+</html>

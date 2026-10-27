@@ -1,0 +1,27 @@
+version: 2
+
+builds:
+  - binary: data_organizer
+    env:
+      - CGO_ENABLED=0 # SQLite is pure Go (modernc.org/sqlite)
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos: [windows, linux, darwin]
+    goarch: [amd64, arm64]
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true

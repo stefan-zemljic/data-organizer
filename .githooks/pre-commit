@@ -1,0 +1,24 @@
+#!/bin/sh
+# Refuses commits that contain a database: by name (*.db, *.sqlite, their
+# -wal/-shm/-journal files, content store packs) or by content (SQLite file header), so even a
+# renamed or force-added database cannot be committed.
+# Enabled per clone with: git config core.hooksPath .githooks
+
+status=0
+git diff --cached --name-only --diff-filter=ACMR -z | while IFS= read -r -d '' path; do
+	case "$path" in
+	*.db | *.db-wal | *.db-shm | *.db-journal | *.sqlite | *.sqlite3 | *.sqlite-wal | *.sqlite-shm | *.sqlite-journal)
+		echo "pre-commit: refusing to commit database file: $path" >&2
+		exit 1
+		;;
+	*.pack | *.packs/*)
+		echo "pre-commit: refusing to commit content store file: $path" >&2
+		exit 1
+		;;
+	esac
+	if [ "$(git cat-file -p ":$path" 2>/dev/null | head -c 15)" = "SQLite format 3" ]; then
+		echo "pre-commit: refusing to commit SQLite database content: $path" >&2
+		exit 1
+	fi
+done || status=1
+exit $status

@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# Developer commands. Run ./dev for a menu, or ./dev <command>.
+set -euo pipefail
+cd "$(dirname "$0")"
+
+URL=http://127.0.0.1:8080/
+
+commands=(
+	"run|Start the app and open it in the browser (UI served from disk: edit, then reload)"
+	"test|Run all tests (about 10 s)"
+	"check|Everything before a commit: format, vet, tests"
+	"platforms|Tests on 32-bit Windows and on Linux 64/32-bit (Docker; a few minutes)"
+	"build|Build the program: one file with the UI embedded"
+)
+
+main() {
+	require_go
+	enable_git_hook
+	local cmd=${1:-}
+	if [[ -z $cmd ]]; then
+		cmd=$(menu)
+	fi
+	case $cmd in
+	run) run ;;
+	test) go test ./... ;;
+	check) check ;;
+	platforms) platforms ;;
+	build) build ;;
+	help | -h | --help) usage ;;
+	*)
+		echo "Unknown command: $cmd" >&2
+		usage >&2
+		exit 2
+		;;
+	esac
+}
+
+usage() {
+	echo "Usage: ./dev [command]   (no command: choose from a menu)"
+	echo
+	for c in "${commands[@]}"; do
+		printf "  %-9s %s\n" "${c%%|*}" "${c#*|}"
+	done
+}
+
+menu() {
+	local i=1
+	echo "data_organizer - what do you want to do?" >&2
+	for c in "${commands[@]}"; do
+		printf "  %d) %-9s %s\n" "$i" "${c%%|*}" "${c#*|}" >&2
+		i=$((i + 1))
+	done
+	local choice
+	read -rp "Choose [1]: " choice
+	choice=${choice:-1}
+	if [[ $choice =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#commands[@]})); then
+		choice=${commands[choice - 1]%%|*}
+	fi
+	echo "$choice"
+}
+
+run() {
+	if curl -s -m 1 -o /dev/null "$URL"; then
+		echo "Already running at $URL - opening it."
+		open_browser
+		return
+	fi
+	echo "Starting at $URL (Ctrl+C stops it; a running backup is paused, saved and continued on the next start)."
+	# The program opens the browser itself (with a one-time login code).
+	# Build and exec (not go run), so Ctrl+C reaches the program itself.
+	local exe=${TMPDIR:-/tmp}/data_organizer-dev$(go env GOEXE)
+	go build -o "$exe" .
+	exec "$exe" -dev
+}
+
+check() {
+	local unformatted
+	unformatted=$(gofmt -l .)
+	if [[ -n $unformatted ]]; then
+		echo "Not gofmt-formatted (run: gofmt -w .):" >&2
+		echo "$unformatted" >&2
+		exit 1
+	fi
+	go vet ./...
+	go test ./...
+	echo "All checks passed."
+}
+
+# Linux runs in Docker (never WSL), with the repo mounted read-only and the
+# module and build caches kept in volumes. 32-bit Windows runs natively.
+platforms() {
+	case $(uname -s) in
+	MINGW* | MSYS* | CYGWIN*)
+		echo "== windows/386"
+		GOARCH=386 go test ./...
+		;;
+	esac
+	require_docker
+	local src
+	src=$(pwd -W 2>/dev/null || pwd)
+	linux() {
+		MSYS_NO_PATHCONV=1 docker run --rm -v "$src:/src:ro" -w /src \
+			-v data_organizer-gomod:/go/pkg/mod -v data_organizer-gocache:/root/.cache/go-build \
+			-e GOTOOLCHAIN=local -e GOFLAGS=-buildvcs=false "$@"
+	}
+	echo "== linux/amd64 (race detector)"
+	linux golang:1.27.3 go test -race ./...
+	echo "== linux/386"
+	linux -e GOARCH=386 golang:1.27.3 go test ./...
+	echo "All platforms passed."
+}
+
+# Starts Docker Desktop on Windows when it is not running.
+require_docker() {
+	docker info >/dev/null 2>&1 && return
+	local desktop="/c/Program Files/Docker/Docker/Docker Desktop.exe"
+	if [[ ! -x $desktop ]]; then
+		echo "Docker is not running. Start it and try again." >&2
+		exit 1
+	fi
+	echo "Starting Docker Desktop..."
+	"$desktop" &
+	for _ in $(seq 90); do
+		docker info >/dev/null 2>&1 && return
+		sleep 2
+	done
+	echo "Docker did not start within 3 minutes." >&2
+	exit 1
+}
+
+build() {
+	local exe
+	exe=data_organizer$(go env GOEXE)
+	go build -o "$exe" .
+	echo "Built $exe. Start it and open $URL (options: ./$exe -h)."
+}
+
+open_browser() {
+	case $(uname -s) in
+	MINGW* | MSYS* | CYGWIN*) start "" "$URL" ;;
+	Darwin) open "$URL" ;;
+	*) xdg-open "$URL" >/dev/null 2>&1 || echo "Open $URL in your browser." ;;
+	esac
+}
+
+require_go() {
+	if ! command -v go >/dev/null; then
+		echo "Go is not installed. Get Go 1.27 or newer from https://go.dev/dl/ and try again." >&2
+		exit 1
+	fi
+}
+
+# The hook refuses commits containing the database (see .githooks/pre-commit).
+enable_git_hook() {
+	if [[ -d .git && $(git config core.hooksPath || true) != .githooks ]]; then
+		git config core.hooksPath .githooks
+		echo "Enabled the git hook that keeps the database out of commits."
+	fi
+}
+
+main "$@"
