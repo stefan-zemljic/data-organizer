@@ -27,7 +27,8 @@ with screenshots (made-up data).
 (Windows, Linux and macOS; amd64 and arm64), unpack it, and run
 `data_organizer` (on Windows: `data_organizer.exe`).
 
-**Or with Go 1.27+:**
+**Or with Go** (1.21 or newer; it fetches the Go 1.27.3 toolchain this
+module needs by itself):
 
 ```bash
 go install github.com/stefan-zemljic/data-organizer@latest
