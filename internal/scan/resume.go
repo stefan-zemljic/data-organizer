@@ -21,6 +21,7 @@ type Partial struct {
 	Children func(dirID int64) ([]StoredChild, error)
 }
 
+// PartialDir is a listed directory of an unfinished scan.
 type PartialDir struct {
 	ID       int64
 	ParentID int64  // 0 for roots

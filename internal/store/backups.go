@@ -62,6 +62,7 @@ func (s *Store) CreateBackup(ctx context.Context, roots []string, firstItemID in
 	return id, tx.Commit()
 }
 
+// SetStatus sets the status of backup id.
 func (s *Store) SetStatus(ctx context.Context, id int64, status string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE backups SET status = ? WHERE id = ?`, status, id)
 	return err
@@ -239,6 +240,7 @@ func (s *Store) ListBackups(ctx context.Context) ([]Backup, error) {
 	return s.queryBackups(ctx, `ORDER BY id DESC`)
 }
 
+// GetBackup returns backup id, or ErrNotFound.
 func (s *Store) GetBackup(ctx context.Context, id int64) (Backup, error) {
 	backups, err := s.queryBackups(ctx, `WHERE id = ?`, id)
 	if err != nil {

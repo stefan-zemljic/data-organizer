@@ -23,8 +23,10 @@ var (
 	ErrNotDirectory = errors.New("not a directory")
 )
 
+// Kind is the type of a listed entry.
 type Kind string
 
+// Entry kinds.
 const (
 	KindDir  Kind = "dir"
 	KindFile Kind = "file"

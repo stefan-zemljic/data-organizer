@@ -17,6 +17,7 @@ type Reader struct {
 	packs map[int64]*os.File
 }
 
+// NewReader returns a Reader for the packs in dir.
 func NewReader(dir string) (*Reader, error) {
 	dec, err := zstd.NewReader(nil, zstd.WithDecoderConcurrency(0), zstd.IgnoreChecksum(true))
 	if err != nil {
@@ -66,6 +67,7 @@ func (r *Reader) pack(id int64) (*os.File, error) {
 	return f, nil
 }
 
+// Close closes the open pack files.
 func (r *Reader) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

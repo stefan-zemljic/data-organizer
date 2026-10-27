@@ -23,6 +23,7 @@ import (
 	"strings"
 )
 
+// CodecRaw and CodecZstd say how a chunk is stored in a pack.
 const (
 	CodecRaw  = 0
 	CodecZstd = 1
@@ -61,6 +62,7 @@ type Index struct {
 	NextChunk int64
 }
 
+// ErrDamaged reports stored content that cannot be read back intact.
 var ErrDamaged = errors.New("stored content is damaged")
 
 func chunkHash(data []byte) [32]byte {
@@ -84,6 +86,7 @@ func EncodeIDs(ids []int64) []byte {
 	return buf
 }
 
+// DecodeIDs decodes a chunk id list written by EncodeIDs.
 func DecodeIDs(buf []byte) ([]int64, error) {
 	var ids []int64
 	var prev int64

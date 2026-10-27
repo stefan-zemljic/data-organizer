@@ -29,6 +29,7 @@ const (
 	StatusStopping = "stopping"
 )
 
+// Errors returned by Manager methods.
 var (
 	ErrBusy           = errors.New("another restore is running")
 	ErrBackupBusy     = errors.New("a backup is running or being deleted; restore when that is done")
@@ -43,6 +44,7 @@ const (
 	flushInterval = time.Second // outcomes are committed at least this often
 )
 
+// Manager runs at most one restore at a time and keeps its live state.
 type Manager struct {
 	store      *store.Store
 	backupBusy func() bool
@@ -288,6 +290,7 @@ func (m *Manager) List(ctx context.Context) ([]store.Restore, error) {
 	return restores, nil
 }
 
+// Get returns restore id, with live progress if it is the active one.
 func (m *Manager) Get(ctx context.Context, id int64) (store.Restore, error) {
 	if cur, ok := m.Current(); ok && cur.ID == id {
 		return cur, nil

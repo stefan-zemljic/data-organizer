@@ -17,6 +17,7 @@ import (
 
 const readBufferSize = 1 << 20
 
+// Options configure a Scanner.
 type Options struct {
 	// Workers is the number of goroutines that list directories and hash
 	// files. Zero picks a default based on the CPU count.
@@ -222,6 +223,7 @@ func (s *Scanner) Done() bool {
 	return s.done
 }
 
+// Progress returns the current counters.
 func (s *Scanner) Progress() Progress {
 	s.mu.Lock()
 	discovering := !s.discovered

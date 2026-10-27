@@ -51,6 +51,7 @@ func (s *Store) NewContentWriter(ctx context.Context) (*content.Writer, error) {
 	return content.NewWriter(s.packDir, idx)
 }
 
+// NewContentReader returns a reader for the stored file contents.
 func (s *Store) NewContentReader() (*content.Reader, error) {
 	return content.NewReader(s.packDir)
 }

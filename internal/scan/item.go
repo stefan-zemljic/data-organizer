@@ -8,8 +8,10 @@ import (
 	"strings"
 )
 
+// Kind is the type of a scanned item.
 type Kind uint8
 
+// Item kinds.
 const (
 	KindFile Kind = 0
 	KindDir  Kind = 1
@@ -51,6 +53,7 @@ type Progress struct {
 	Errors      int64 `json:"errors"`
 }
 
+// ErrNoRoots is returned when a scan is started without paths.
 var ErrNoRoots = errors.New("no paths to scan")
 
 // NormalizeRoots cleans the given absolute paths, removes duplicates and

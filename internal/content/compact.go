@@ -8,7 +8,7 @@ import (
 	"slices"
 )
 
-// CompactRatio: a pack whose live bytes are below this share of its size
+// CompactRatio is the share of live bytes below which a pack
 // is rewritten. Rewriting a pack costs at most as much as it frees.
 const CompactRatio = 0.5
 

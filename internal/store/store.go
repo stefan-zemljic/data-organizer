@@ -22,8 +22,10 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
+// ErrNotFound is returned when a requested record does not exist.
 var ErrNotFound = errors.New("not found")
 
+// Store is the SQLite database and the content store's pack files.
 type Store struct {
 	db      *sql.DB
 	packDir string // pack files of the content store
@@ -62,6 +64,7 @@ func PackDir(dbPath string) string {
 	return strings.TrimSuffix(dbPath, filepath.Ext(dbPath)) + ".packs"
 }
 
+// Close closes the database.
 func (s *Store) Close() error {
 	return s.db.Close()
 }

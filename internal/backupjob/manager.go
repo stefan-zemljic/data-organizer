@@ -24,6 +24,7 @@ const (
 
 const flushInterval = time.Second
 
+// Errors returned by Manager methods.
 var (
 	ErrBusy         = errors.New("another backup is active")
 	ErrNotActive    = errors.New("backup is not active")
@@ -32,6 +33,7 @@ var (
 	ErrDeleting     = errors.New("a backup is being deleted; try again when that is done")
 )
 
+// Manager runs at most one backup at a time and keeps its live state.
 type Manager struct {
 	store *store.Store
 	opts  scan.Options
@@ -69,6 +71,7 @@ func newJob(id int64, roots []string, started time.Time, status string) *job {
 	}
 }
 
+// New returns a Manager that stores backups in st and scans with opts.
 func New(st *store.Store, opts scan.Options) *Manager {
 	return &Manager{store: st, opts: opts}
 }
@@ -358,6 +361,7 @@ func (m *Manager) Pause(id int64) (store.Backup, error) {
 	return j.snapshot(), nil
 }
 
+// Resume continues the paused active backup id.
 func (m *Manager) Resume(id int64) (store.Backup, error) {
 	j, err := m.activeJob(id)
 	if err != nil {
@@ -464,6 +468,7 @@ func (m *Manager) List(ctx context.Context) ([]store.Backup, error) {
 	return backups, nil
 }
 
+// Get returns backup id, with live progress if it is the active one.
 func (m *Manager) Get(ctx context.Context, id int64) (store.Backup, error) {
 	if cur, ok := m.Current(); ok && cur.ID == id {
 		return cur, nil

@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// ErrRestoreUnfinished is returned when exclusions change while a restore of the backup is running or paused.
 var ErrRestoreUnfinished = errors.New("a restore of this backup is running or paused; exclusions can change when it has finished or was stopped")
 
 // Restore statuses. Running and paused restores are unfinished: the next
@@ -28,7 +29,7 @@ const (
 	RestoreItemFailed = 2 // not written to the target, or its stored content is damaged
 )
 
-// Directory flags (restore_items.flags): what happened somewhere below.
+// RestoreFlagErrorsBelow is a directory flag (restore_items.flags): something below failed.
 const RestoreFlagErrorsBelow = 1 // a failed item below
 
 // RestoreProgress counts a restore's work. FilesDone = OK + Failed.
@@ -54,6 +55,7 @@ type Restore struct {
 	Error      string          `json:"error,omitempty"`
 }
 
+// CreateRestore records a new running restore of backupID into target and returns its id.
 func (s *Store) CreateRestore(ctx context.Context, backupID int64, target string, startedAt time.Time) (int64, error) {
 	res, err := s.db.ExecContext(ctx, `INSERT INTO restores (backup_id, target, status, started_at) VALUES (?, ?, ?, ?)`,
 		backupID, target, RestoreRunning, startedAt.UnixMilli())
@@ -63,6 +65,7 @@ func (s *Store) CreateRestore(ctx context.Context, backupID int64, target string
 	return res.LastInsertId()
 }
 
+// FinishRestore records the end of restore id with its final status and progress.
 func (s *Store) FinishRestore(ctx context.Context, id int64, status string, p RestoreProgress, finishedAt time.Time, errMsg string) error {
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE restores SET status = ?, finished_at = ?, files_total = ?, bytes_total = ?, files_done = ?, bytes_done = ?,
@@ -130,10 +133,12 @@ func (s *Store) RestoreOutcomes(ctx context.Context, restoreID int64, fn func(it
 	return rows.Err()
 }
 
+// ListRestores returns all restores, newest first.
 func (s *Store) ListRestores(ctx context.Context) ([]Restore, error) {
 	return s.queryRestores(ctx, `ORDER BY id DESC`)
 }
 
+// GetRestore returns restore id, or ErrNotFound.
 func (s *Store) GetRestore(ctx context.Context, id int64) (Restore, error) {
 	restores, err := s.queryRestores(ctx, `WHERE id = ?`, id)
 	if err != nil {
@@ -310,10 +315,12 @@ type RestoreItemWriter struct {
 	pending   int
 }
 
+// NewRestoreItemWriter returns a writer for the outcomes of restore restoreID.
 func (s *Store) NewRestoreItemWriter(restoreID int64) *RestoreItemWriter {
 	return &RestoreItemWriter{db: s.db, restoreID: restoreID}
 }
 
+// Write records an outcome; it commits once a batch is full.
 func (w *RestoreItemWriter) Write(ctx context.Context, o RestoreOutcome) error {
 	if w.tx == nil {
 		tx, err := w.db.BeginTx(ctx, nil)
@@ -338,6 +345,7 @@ func (w *RestoreItemWriter) Write(ctx context.Context, o RestoreOutcome) error {
 	return nil
 }
 
+// Flush commits the pending outcomes.
 func (w *RestoreItemWriter) Flush() error {
 	if w.tx == nil {
 		return nil
